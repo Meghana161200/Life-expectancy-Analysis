@@ -1,0 +1,304 @@
+---
+title: "LIFE EXPECTANCY ANALYSIS"
+author: "MEGHANA ATLURI"
+format: pdf
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  tidy = TRUE,
+  comment = "#>",
+  fig.align = 'center',
+  echo = TRUE
+)
+```
+
+```{r}
+# importing library
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(janitor)
+library(lubridate)
+library(gghighlight)
+```
+
+### [Data]{.underline}
+
+```{r}
+data <- read_csv("Life Expectancy Data.csv")
+```
+
+```{r}
+#Dimensions
+dim(data)
+```
+
+```{r}
+#Glimpse
+glimpse(data)
+```
+
+```{r}
+#Columns in data
+colnames(data)
+```
+
+### [Data Cleaning]{.underline}
+
+```{r}
+# Rename columns 
+data <- data |>
+  clean_names() |>
+  rename(
+    country = country,
+    year = year,
+    status = status,
+    life_expectancy = life_expectancy,
+    adult_mortality = adult_mortality,
+    infant_deaths = infant_deaths,
+    alcohol = alcohol,
+    perc_expenditure = percentage_expenditure,
+    hepatitis_b = hepatitis_b,
+    measles = measles,
+    bmi = bmi,
+    under5_deaths = under_five_deaths,
+    polio = polio,
+    total_expenditure = total_expenditure,
+    diphtheria = diphtheria,
+    hiv_aids = hiv_aids,
+    gdp = gdp,
+    population = population,
+    thinness_1_19 = thinness_1_19_years,
+    thinness_5_9 = thinness_5_9_years,
+    income_comp = income_composition_of_resources,
+    schooling = schooling
+  )
+
+```
+
+```{r}
+#Drop Columns
+data <- select(data, -c(12,19,20))
+```
+
+```{r}
+#Check NAs
+count_na <- function(x) {
+  sum(is.na(x))
+}
+apply(data, MARGIN = 2, FUN = count_na)
+```
+
+```{r}
+#Drop rows with missing life_expectancy (target variable)
+data <- data |> filter(!is.na(life_expectancy))
+```
+
+```{r}
+#Drop NAs
+data <- data |> drop_na()
+```
+
+```{r}
+#Converting DataTypes
+data <- data |>
+  mutate(
+    year = as.factor(year),
+    status = as.factor(status),
+    country = as.factor(country)
+  )
+```
+
+## Exploratory Data Analysis
+
+```{r}
+summary(data)
+```
+
+```{r}
+#Distribution of Life Expectancy
+ggplot(data, aes(x = life_expectancy)) +
+  geom_histogram(fill = "steelblue", bins = 30, color = "white") +
+  theme_minimal() +
+  labs(title = "Distribution of Life Expectancy", 
+       x = "Life Expectancy", 
+       y = "Count")
+```
+
+While many countries enjoy life expectancy above 70 years, a notable proportion still falls below 60yrs. The distribution is **right-skewed.**
+
+```{r}
+#Life Expectancy vs Alcohol Consumption
+ggplot(data, aes(x = alcohol, y = life_expectancy, color = alcohol)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  scale_color_gradient(low = "#0091ff", high = "#f0650e") +
+  theme_minimal() +
+  labs(title = "Life Expectancy vs Alcohol Consumption",
+       x = "Alcohol (litres/year)",
+       y = "Life Expectancy")
+
+```
+
+While the scatter plot shows a **positive association** between alcohol consumption and life expectancy, It is more likely that both variables are influenced by underlying factors — particularly national income level, which affects both healthcare access and lifestyle.
+
+**Correlation is not Causation-** Just because they are correlated doesn't mean that one causes the other.
+
+```{r}
+#Life Expectancy by Status
+ggplot(data, aes(x = status, y = life_expectancy, fill = status)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Life Expectancy by Status",
+       x = "Country Status",
+       y = "Life Expectancy")
+```
+
+The boxplot clearly illustrates that developed countries tend to have significantly higher and more consistent life expectancy compared to developing countries.
+
+This supports the idea that country status is often associated with healthcare infrastructure, education, and income plays a critical role in determining life expectancy.
+
+```{r}
+#Top 10 countries by average life expectancy.
+data %>%
+  group_by(country) %>%
+  summarise(mean_life = mean(life_expectancy)) %>%
+  arrange(desc(mean_life)) %>%
+  slice_head(n = 10) 
+```
+
+The countries with the highest average life expectancy are predominantly developed nations, each exceeding an average life expectancy of over 81 years.
+
+### [MODELING]{.underline}
+
+```{r}
+#Linear Model
+model<- lm(life_expectancy ~ alcohol,data)
+summary(model)
+```
+
+**life_expectancy = β0 + β1 Alcohol_consumption + ε**
+
+-   H0: **β1=0**\
+    *(*There is no linear relationship between alcohol consumption and life expectancy)
+
+-   **H1: β1\<0**\
+    *(*There is a negative linear relationship between alcohol consumption and life expectancy)
+
+**life_expectancy = 65.31 + 0.88​⋅alcohol + ε**
+
+```{r}
+# Visual checks
+plot(model, which = 1)  # Linearity & homoscedasticity
+plot(model, which = 2)  # Normality of residuals
+
+# Statistical tests
+shapiro.test(residuals(model))  # Normality
+library(lmtest)
+dwtest(model)                   # Independence of residuals
+
+```
+
+-   All assumptions are **not** met.
+
+-   The residuals are not evenly spread around zero suggests **non-linearity.**
+
+-   Residuals deviate from the normal line, especially at the tails residuals are **not normally distributed**. Reject normality.
+
+```{r}
+#confidence interval 
+confint(model, level = 0.95)
+```
+
+We are 95% confident that for each 1 litre increase in alcohol consumption, life expectancy increases between 0.78 and 0.98 years, on average.
+
+**Based on ICOR**
+
+```{r}
+#Plot highlight low icor (<0.5)
+data |>
+  ggplot(aes(
+    x = alcohol, 
+    y = life_expectancy, 
+    color = income_comp))+
+  geom_point( alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Life Expectancy, Alcohol, and ICOR", 
+       x = "Alcohol Consumption (in litres of pure alcohol)",
+       y = "Life expectancy(in age)")+
+  theme_minimal()+scale_color_viridis_b()+
+  gghighlight(income_comp< 0.550)
+
+```
+
+Among countries with low income composition (ICOR \< 0.55), higher alcohol consumption is associated with significantly lower life expectancy.
+
+```{r}
+#Plot of Alcohol, life expectancy based on ICOR
+data%>%
+  ggplot(aes(
+    x = alcohol, 
+    y = life_expectancy, 
+    color = income_comp))+
+  geom_point( alpha = 0.2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Life Expectancy, Alcohol, and ICOR", 
+       x = "Alcohol Consumption (in litres of pure alcohol)",
+       y = "Life expectancy(in age)")+
+  theme_minimal() +scale_color_viridis_b()
+```
+
+```{r}
+#summary statistic of alcohol consumption and life expectancy based on ICOR
+data %>%
+  select(alcohol, life_expectancy,income_comp ) %>% 
+  filter (income_comp>= 0.5)%>%
+  summarise (mean_alcohol = mean(alcohol),
+             sd_Alcohol = sd(alcohol),
+             mean_life.expectancy = mean(life_expectancy),
+             sd_life.expectancy = sd(life_expectancy))
+
+data %>%
+  select(alcohol, life_expectancy, income_comp) %>% 
+  filter (income_comp < 0.5)%>%
+  summarise (mean_alcohol = mean(alcohol),
+             sd_Alcohol = sd(alcohol),
+             mean_life.expectancy = mean(life_expectancy),
+             sd_life.expectancy = sd(life_expectancy))
+
+```
+
+Alcohol consumption and life expectancy is higher in high ICOR countries.
+
+```{r}
+# Create a new variable for income group
+data$income_group <- ifelse(data$income_comp < 0.55, "< 0.55", "≥ 0.55")
+
+# Fit interaction model
+model2 <- lm(life_expectancy ~ alcohol * income_comp, data = data)
+summary(model2)
+```
+
+life_expectancy=54.08−2.57⋅acohol+24.45⋅income_comp+3.49⋅(alcohol×income_comp)
+
+```{r}
+# Predict values
+data$predicted <- predict(model2)
+
+# Plot
+ggplot(data, aes(x = alcohol, y = life_expectancy, color = income_group)) +
+  geom_point(alpha = 0.3)
+
+```
+
+**COMPARE MODELS**
+
+```{r}
+anova(model, model2)
+```
+
+The interaction between alcohol and income composition is highly statistically significant, suggesting that the effect of alcohol on life expectancy depends on income level.
