@@ -20,11 +20,10 @@ Statistical analysis of global life expectancy with Regression, Hypothesis Testi
 ---
 
 # Workflow
-
-### Data Cleaning
-### Exploratory Data Analysis (EDA)
-### Hypothesis Testing
-### Linear Regression
-### Assumption Diagnostics
-### ANOVA (Model Comparison)
+Data Cleaning
+Exploratory Data Analysis (EDA)
+Hypothesis Testing
+Linear Regression
+Assumption Diagnostics
+ANOVA (Model Comparison)
 
